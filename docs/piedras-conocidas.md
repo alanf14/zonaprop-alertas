@@ -10,3 +10,5 @@ Trampas que costaron tiempo. Leer al arrancar sesión. Una línea + fecha + mét
 - **El filtro `-menos-2000000-pesos` deja pasar avisos en USD** (16-11-2026): Zonaprop convierte. Para sumar expensas hay que convertir con `usd_ars` del criterio.
 - **En venta, Zonaprop ignora el `-mas-{min}` si va junto a `-menos-{max}-dolar`** (16-11-2026, appliedFilters muestra solo el tope). El mínimo lo filtra `match.py`.
 - **403 desde la página 10** (16-11-2026, baseline venta): Zonaprop corta la paginación profunda. Para corridas periódicas alcanza con 2 páginas ordenando por `-orden-publicado-descendente`.
+- **Zonaprop bloquea IPs de data center** (16-11-2026, workflow de diagnóstico en GitHub Actions, curl y requests): `403` + `cf-mitigated: challenge` ("Just a moment…") de Cloudflare, incluso en la home. Desde IP residencial: `200`. GitHub Actions NO sirve para scrapear Zonaprop. No evadir el anti-bot.
+- **GitHub enmascara cada LÍNEA de un Secret multilínea** (16-11-2026): un JSON con indentación y una línea "3" hace que todos los "3" del log salgan `***`. Cargar JSON compacto en una línea.
