@@ -1,0 +1,67 @@
+# Corre el buscador cada 15 min y avisa a Discord.
+#
+# Repo PUBLICO => el codigo, el historial y los LOGS son publicos. Por eso:
+#   - criterios.json viene de un Secret (no esta en el repo)
+#   - la base de vistos se guarda CIFRADA (data/vistos.db.enc, AES-256, clave en Secret)
+#   - el buscador corre con LOG_LEVEL=ERROR y stdout descartado (sin barrios/precios/avisos)
+#   - sin triggers de pull_request: un fork no puede correr nada ni ver Secrets
+name: buscar-avisos
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # GitHub puede demorar unos minutos los cron en horas pico
+  workflow_dispatch:          # boton "Run workflow" (solo quien tiene permiso de escritura)
+
+concurrency:
+  group: buscar-avisos       # nunca dos corridas a la vez (pisarian la base)
+  cancel-in-progress: false
+
+permissions:
+  contents: write            # unico permiso: commitear la base cifrada
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Preparar
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet "requests>=2.32,<3"
+
+      - name: Descifrar
+        id: descifrar
+        env:
+          VISTOS_KEY: ${{ secrets.VISTOS_KEY }}
+          CRITERIOS_JSON: ${{ secrets.CRITERIOS_JSON }}
+        run: |
+          printf '%s' "$CRITERIOS_JSON" > criterios.json
+          # Sin base cifrada NO se corre: arrancar vacio avisaria todo el inventario.
+          test -f data/vistos.db.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in data/vistos.db.enc -out data/vistos.db -pass env:VISTOS_KEY
+          sha256sum data/vistos.db > "$RUNNER_TEMP/antes.sha"
+
+      - name: Buscar y avisar
+        env:
+          DISCORD_WEBHOOK_ALQUILER: ${{ secrets.DISCORD_WEBHOOK_ALQUILER }}
+          LOG_LEVEL: ERROR
+        run: .venv/bin/python src/run.py --notificar discord --max-paginas 2 > /dev/null
+
+      - name: Cifrar y guardar
+        # Corre aunque el buscador falle (para no perder lo ya avisado), pero NUNCA
+        # si fallo el descifrado: pisaria la base buena con una vacia.
+        if: always() && steps.descifrar.outcome == 'success'
+        env:
+          VISTOS_KEY: ${{ secrets.VISTOS_KEY }}
+        run: |
+          sha256sum --quiet -c "$RUNNER_TEMP/antes.sha" && exit 0   # sin cambios: no commitea
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in data/vistos.db -out data/vistos.db.enc -pass env:VISTOS_KEY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/vistos.db.enc
+          git commit -q -m "vistos"
+          git push -q || (git pull -q --rebase && git push -q)

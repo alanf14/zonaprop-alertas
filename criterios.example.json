@@ -1,0 +1,18 @@
+{
+  "criterios": [
+    {
+      "nombre_cliente": "Ejemplo alquiler",
+      "operacion": "alquiler",
+      "tipos": ["departamentos", "ph", "casas"],
+      "tipo_ambiente": "dormitorios",
+      "valores": [3],
+      "barrios": ["Belgrano", "Nuñez"],
+      "precio_min": null,
+      "precio_max": 1500000,
+      "moneda": "ARS",
+      "incluir_expensas": true,
+      "usd_ars": 1600,
+      "webhook_env": "DISCORD_WEBHOOK_ALQUILER"
+    }
+  ]
+}
